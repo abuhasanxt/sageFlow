@@ -1,7 +1,8 @@
 enum Role {
-    ADMIN
-    USER
+  ADMIN
+  USER
 }
+
 enum DocumentSource {
   TEXT
   MARKDOWN
@@ -12,4 +13,9 @@ enum DocumentStatus {
   PROCESSING
   READY
   FAILED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
 }
