@@ -1,3 +1,4 @@
+import { retrieveRelevantChunks } from "../module/chat/chat.service";
 import { generateEmbedding } from "./embedding";
 
 export const test = async () => {
@@ -6,4 +7,20 @@ export const test = async () => {
   );
 
   console.log("Vector length:", vector.length);
+};
+
+
+export const testRetrieval = async () => {
+  const userId ="96efaf35-1114-49a5-b583-2370409a8d9d";
+
+  const question = "What is react?";
+
+  const results = await retrieveRelevantChunks(
+    userId,
+    question
+  );
+
+  console.log(
+    JSON.stringify(results, null, 2)
+  );
 };

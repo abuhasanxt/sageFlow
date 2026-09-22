@@ -3,7 +3,7 @@ import app from "./app";
 import { envVars } from "./config/env";
 import { createQdrantCollection } from "./lib/qdran";
 import { redisService } from "./lib/redis";
-import { test } from "./lib/test";
+import { test, testRetrieval } from "./lib/test";
 import { seedAdmin } from "./utils/seed";
 
 const port = envVars.PORT; // The port your express server will be running on.
@@ -15,6 +15,7 @@ const bootstrap = async () => {
     await redisService.connect()
     await createQdrantCollection()
     await test()
+    await testRetrieval()
     app.listen(port, () => {
       console.log(`Server is running on http://localhost:${port}`);
     });
