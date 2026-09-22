@@ -1,6 +1,7 @@
 
 import app from "./app";
 import { envVars } from "./config/env";
+import { testQdranConnection } from "./lib/qdran";
 import { redisService } from "./lib/redis";
 import { seedAdmin } from "./utils/seed";
 
@@ -11,6 +12,7 @@ const bootstrap = async () => {
   try {
     await seedAdmin()
     await redisService.connect()
+    await testQdranConnection()
     app.listen(port, () => {
       console.log(`Server is running on http://localhost:${port}`);
     });
