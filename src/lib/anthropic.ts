@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { envVars } from "../config/env";
+import { AI_CONFIG } from "../config/ai";
 
 export const anthropic=new Anthropic({
     apiKey:envVars.ANTHROPIC_API_KEY
@@ -7,8 +8,8 @@ export const anthropic=new Anthropic({
 
 export const testClaudeConnection = async () => {
   const response = await anthropic.messages.create({
-    model: "claude-3-5-haiku-latest",
-    max_tokens: 20,
+    model: AI_CONFIG.claudeModel,
+    max_tokens: AI_CONFIG.maxTokens,
     messages: [
       {
         role: "user",
