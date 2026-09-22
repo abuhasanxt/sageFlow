@@ -7,18 +7,19 @@ const createDocument = async (userId: string, payload: CreateDocumentInput) => {
   const document = await prisma.document.create({
     data: {
       userId,
-      title:payload.title,
-      sourceType:payload.sourceType,
-      status:DocumentStatus.PROCESSING
+      title: payload.title,
+      content: payload.content,
+      sourceType: payload.sourceType,
+      status: DocumentStatus.PROCESSING,
     },
   });
   await documentQueue.add("process-document", {
     documentId: document.id,
     userId,
   });
-  return document
+  return document;
 };
 
-export const documentService={
-    createDocument
-}
+export const documentService = {
+  createDocument,
+};

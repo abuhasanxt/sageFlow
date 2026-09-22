@@ -2,6 +2,7 @@ model Document {
   id         String         @id @default(uuid())
   userId     String
   title      String
+  content    String
   sourceType DocumentSource
   status     DocumentStatus @default(PROCESSING)
   user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
