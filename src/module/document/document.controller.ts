@@ -16,7 +16,20 @@ const createDocument=catchAsync(async(req:Request,res:Response)=>{
     })
 })
 
+const deleteDocument=catchAsync(async(req:Request,res:Response)=>{
+    const userId=req.user.userId
+    const {id}= req.params
+
+    const document=await documentService.deleteDocument(id as string,userId)
+    sendResponse(res,{
+        success:true,
+        httpStatusCode:status.OK,
+        message:"Document deleted successfully",
+        data:document
+    })
+})
 
 export const documentController={
-    createDocument
+    createDocument,
+    deleteDocument
 }

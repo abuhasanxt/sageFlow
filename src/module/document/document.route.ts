@@ -13,5 +13,10 @@ router.post(
   validateRequest(createDocumentSchema),
   documentController.createDocument,
 );
+router.delete(
+  "/:id",
+  checkAuth(Role.USER),
+  documentController.deleteDocument
+);
 
 export const documentRoutes=router
