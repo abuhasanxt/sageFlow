@@ -1,4 +1,5 @@
 import { buildRAGContext, buildRAGPrompt, retrieveRelevantChunks } from "../module/chat/chat.service";
+import { generateRAGAnswer } from "../module/chat/rag.service";
 import { generateEmbedding } from "./embedding";
 
 export const test = async () => {
@@ -38,3 +39,23 @@ const prompt = buildRAGPrompt(
 );
 
 console.log(prompt);
+
+
+
+const testRAG = async () => {
+  const userId =
+    "96efaf35-1114-49a5-b583-2370409a8d9d";
+
+  const question = "What is JavaScript?";
+
+  const result = await generateRAGAnswer(
+    userId,
+    question,
+  );
+
+  console.log(
+    JSON.stringify(result, null, 2),
+  );
+};
+
+testRAG();
