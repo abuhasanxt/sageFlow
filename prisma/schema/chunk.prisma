@@ -15,4 +15,5 @@ model Chunk {
 
   @@index([documentId])
   @@index([userId])
+  @@unique([documentId, chunkIndex])
 }

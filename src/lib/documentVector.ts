@@ -1,4 +1,3 @@
-
 import { generateEmbedding } from "./embedding";
 import { prisma } from "./prisma";
 import { qdrant } from "./qdran";
@@ -13,41 +12,68 @@ export const storeDocumentChunks = async (
   const points = [];
 
   for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
+    const chunkContent = chunks[i];
 
-    const vector = await generateEmbedding(chunk);
+    //  Generate embedding
+    const vector = await generateEmbedding(chunkContent);
 
-    const vectorId = crypto.randomUUID();
+    //  Find existing chunk
+    const existingChunk = await prisma.chunk.findUnique({
+      where: {
+        documentId_chunkIndex: {
+          documentId,
+          chunkIndex: i,
+        },
+      },
+    });
 
+    //  Reuse existing vectorId or create new one
+    const vectorId = existingChunk?.vectorId ?? crypto.randomUUID();
+
+    //  Create or update PostgreSQL chunk
+    const chunk = await prisma.chunk.upsert({
+      where: {
+        documentId_chunkIndex: {
+          documentId,
+          chunkIndex: i,
+        },
+      },
+
+      update: {
+        content: chunkContent,
+        tokenCount: chunkContent.split(/\s+/).length,
+        vectorId,
+      },
+
+      create: {
+        documentId,
+        userId,
+        content: chunkContent,
+        chunkIndex: i,
+        tokenCount: chunkContent.split(/\s+/).length,
+        vectorId,
+      },
+    });
+
+    //  Prepare Qdrant point
     points.push({
       id: vectorId,
       vector,
 
       payload: {
-        documentId,
         userId,
-        chunk,
-        chunkIndex: i,
-      },
-    });
-
-    await prisma.chunk.create({
-      data: {
         documentId,
-        userId,
-        content: chunk,
-        chunkIndex: i,
-        tokenCount: chunk.split(/\s+/).length,
-        vectorId,
+        chunkId: chunk.id,
       },
     });
   }
 
+  //  Batch upsert into Qdrant
   await qdrant.upsert(COLLECTION_NAME, {
     wait: true,
     points,
   });
 
-  console.log(`${points.length} chunks stored in Qdrant`);
   console.log(`${points.length} chunks stored in PostgreSQL`);
+  console.log(`${points.length} vectors stored in Qdrant`);
 };
