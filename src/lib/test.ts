@@ -1,4 +1,4 @@
-import { retrieveRelevantChunks } from "../module/chat/chat.service";
+import { buildRAGContext, buildRAGPrompt, retrieveRelevantChunks } from "../module/chat/chat.service";
 import { generateEmbedding } from "./embedding";
 
 export const test = async () => {
@@ -24,3 +24,17 @@ export const testRetrieval = async () => {
     JSON.stringify(results, null, 2)
   );
 };
+
+const chunks = await retrieveRelevantChunks(
+  "96efaf35-1114-49a5-b583-2370409a8d9d",
+  "What is JavaScript?"
+);
+
+const context = buildRAGContext(chunks);
+
+const prompt = buildRAGPrompt(
+  "What is JavaScript?",
+  context
+);
+
+console.log(prompt);

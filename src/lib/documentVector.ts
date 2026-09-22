@@ -1,4 +1,4 @@
-import { generateEmbedding } from "./embedding";
+import {  generateEmbeddings } from "./embedding";
 import { prisma } from "./prisma";
 import { qdrant } from "./qdran";
 
@@ -7,30 +7,39 @@ const COLLECTION_NAME = "sageflow_documents";
 export const storeDocumentChunks = async (
   documentId: string,
   userId: string,
-  chunks: string[]
+  chunks: string[],
 ) => {
+  if (!chunks.length) {
+    throw new Error("No chunks found");
+  }
+
+  const embeddings = await generateEmbeddings(chunks);
+
   const points = [];
 
   for (let i = 0; i < chunks.length; i++) {
     const chunkContent = chunks[i];
+    const vector = embeddings[i];
 
-    //  Generate embedding
-    const vector = await generateEmbedding(chunkContent);
+    if (!vector || vector.length === 0) {
+      throw new Error(
+        `Embedding generation failed for chunk ${i}`,
+      );
+    }
 
-    //  Find existing chunk
-    const existingChunk = await prisma.chunk.findUnique({
-      where: {
-        documentId_chunkIndex: {
-          documentId,
-          chunkIndex: i,
+    const existingChunk =
+      await prisma.chunk.findUnique({
+        where: {
+          documentId_chunkIndex: {
+            documentId,
+            chunkIndex: i,
+          },
         },
-      },
-    });
+      });
 
-    //  Reuse existing vectorId or create new one
-    const vectorId = existingChunk?.vectorId ?? crypto.randomUUID();
+    const vectorId =
+      existingChunk?.vectorId ?? crypto.randomUUID();
 
-    //  Create or update PostgreSQL chunk
     const chunk = await prisma.chunk.upsert({
       where: {
         documentId_chunkIndex: {
@@ -41,7 +50,8 @@ export const storeDocumentChunks = async (
 
       update: {
         content: chunkContent,
-        tokenCount: chunkContent.split(/\s+/).length,
+        tokenCount: chunkContent.split(/\s+/).filter(Boolean)
+          .length,
         vectorId,
       },
 
@@ -50,12 +60,12 @@ export const storeDocumentChunks = async (
         userId,
         content: chunkContent,
         chunkIndex: i,
-        tokenCount: chunkContent.split(/\s+/).length,
+        tokenCount: chunkContent.split(/\s+/).filter(Boolean)
+          .length,
         vectorId,
       },
     });
 
-    //  Prepare Qdrant point
     points.push({
       id: vectorId,
       vector,
@@ -68,12 +78,16 @@ export const storeDocumentChunks = async (
     });
   }
 
-  //  Batch upsert into Qdrant
   await qdrant.upsert(COLLECTION_NAME, {
     wait: true,
     points,
   });
 
-  console.log(`${points.length} chunks stored in PostgreSQL`);
-  console.log(`${points.length} vectors stored in Qdrant`);
+  console.log(
+    `${points.length} chunks stored in PostgreSQL`,
+  );
+
+  console.log(
+    `${points.length} vectors stored in Qdrant`,
+  );
 };
