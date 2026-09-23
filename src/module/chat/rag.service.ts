@@ -1,5 +1,6 @@
 import { AI_CONFIG } from "../../config/ai";
-import { anthropic } from "../../lib/anthropic";
+import { openai } from "../../lib/onenai";
+
 import { buildRAGContext, buildRAGPrompt, retrieveRelevantChunks } from "./chat.service";
 
 
@@ -7,13 +8,13 @@ export const generateRAGAnswer = async (
   userId: string,
   question: string,
 ) => {
-  // 1. Retrieve relevant chunks
+  //  Retrieve relevant chunks
   const chunks = await retrieveRelevantChunks(
     userId,
     question,
   );
 
-  // 2. No relevant information
+  //  No relevant information
   if (chunks.length === 0) {
     return {
       answer:
@@ -22,17 +23,17 @@ export const generateRAGAnswer = async (
     };
   }
 
-  // 3. Build context
+  //  Build context
   const context = buildRAGContext(chunks);
 
-  // 4. Build prompt
+  //  Build prompt
   const prompt = buildRAGPrompt(
     question,
     context,
   );
 
-  // 5. Ask Claude
-  const response = await anthropic.messages.create({
+  //  Ask Claude
+  const response = await openai.chat.completions.create({
     model: AI_CONFIG.claudeModel,
     max_tokens: AI_CONFIG.maxTokens,
     messages: [
@@ -43,13 +44,8 @@ export const generateRAGAnswer = async (
     ],
   });
 
-  // 6. Extract Claude text
-  const answer = response.content
-    .filter(
-      (item) => item.type === "text",
-    )
-    .map((item) => item.text)
-    .join("\n");
+  //  Extract Claude text
+  const answer = response.choices[0]?.message?.content;
 
   return {
     answer,

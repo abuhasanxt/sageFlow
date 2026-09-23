@@ -10,7 +10,7 @@ interface EnvConfig {
   REDIS_URL: string;
   QDRANT_URL: string;
   QDRANT_API_KEY: string;
-  ANTHROPIC_API_KEY: string;
+  OPENAI_API_KEY: string;
   JWT_ACCESS_SECRET: string;
   JWT_ACCESS_EXPIRES_IN: string;
   JWT_REFRESH_SECRET: string;
@@ -42,7 +42,7 @@ const loadEnvVariables = () => {
     "REDIS_URL",
     "QDRANT_URL",
     "QDRANT_API_KEY",
-    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
     "JWT_ACCESS_SECRET",
     "JWT_REFRESH_SECRET",
     "JWT_REFRESH_EXPIRES_IN",
@@ -77,7 +77,7 @@ const loadEnvVariables = () => {
     REDIS_URL: process.env.REDIS_URL as string,
     QDRANT_URL: process.env.QDRANT_URL as string,
     QDRANT_API_KEY: process.env.QDRANT_API_KEY as string,
-    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY as string,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY as string,
     JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET as string,
     JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN as string,
     JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET as string,
