@@ -11,5 +11,9 @@ router.post(
   checkAuth(Role.USER),
   chatController.sendMessage,
 );
-
+router.get(
+  "/conversations/:id",
+  checkAuth(Role.USER),
+  chatController.getConversationById,
+);
 export const chatRoutes = router;

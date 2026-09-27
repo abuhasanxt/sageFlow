@@ -87,9 +87,46 @@ const sendMessage = async (
   };
 };
 
+const getConversationById = async (
+  userId: string,
+  conversationId: string,
+) => {
+  const conversation = await prisma.conversation.findFirst({
+    where: {
+      id: conversationId,
+      userId,
+    },
+    include: {
+      messages: {
+        orderBy: {
+          createdAt: "asc",
+        },
+      },
+    },
+  });
+
+  if (!conversation) {
+    throw new AppError(
+      status.NOT_FOUND,
+      "Conversation not found",
+    );
+  }
+
+  return {
+    ...conversation,
+    messages: conversation.messages.map((message) => ({
+      ...message,
+      citations: message.citations.map((citation) =>
+        JSON.parse(citation),
+      ),
+    })),
+  };
+};
+
 export const chatApiService = {
   checkConversation,
   saveUserMessage,
   saveAssistantMessage,
   sendMessage,
+  getConversationById
 };

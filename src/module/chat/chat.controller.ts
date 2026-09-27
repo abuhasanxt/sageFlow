@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { chatApiService } from "./chat.api.service";
 import { status } from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
+import { sendResponse } from "../../shared/sendResponse";
 
 const sendMessage = catchAsync(
   async (req: Request, res: Response) => {
@@ -114,7 +115,26 @@ const sendMessage = catchAsync(
     }
   },
 );
+const getConversationById = catchAsync(
+  async (req: Request, res: Response) => {
+    const userId = req.user.userId;
+    const { id } = req.params;
 
+    const result =
+      await chatApiService.getConversationById(
+        userId,
+        id as string,
+      );
+
+    sendResponse(res, {
+      success: true,
+      httpStatusCode:status.OK,
+      message: "Conversation retrieved successfully",
+      data: result,
+    });
+  },
+);
 export const chatController = {
   sendMessage,
+  getConversationById
 };
