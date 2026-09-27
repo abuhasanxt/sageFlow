@@ -1,7 +1,7 @@
 import { generateEmbedding } from "../../lib/embedding";
 import { prisma } from "../../lib/prisma";
 import { searchUserDocuments } from "../../lib/qdran";
-
+const SIMILARITY_THRESHOLD = 0.25;
 export const retrieveRelevantChunks = async (
   userId: string,
   question: string,
@@ -13,8 +13,12 @@ export const retrieveRelevantChunks = async (
     queryVector,
     5,
   );
-
-  const chunkIds = results.points
+ // Filter low similarity results
+  const relevantPoints = results.points.filter(
+    (point) =>
+      point.score >= SIMILARITY_THRESHOLD,
+  );
+  const chunkIds = relevantPoints
     .map((result) => result.payload?.chunkId)
     .filter(
       (chunkId): chunkId is string =>
@@ -46,7 +50,7 @@ export const retrieveRelevantChunks = async (
         return null;
       }
 
-      const qdrantResult = results.points.find(
+      const qdrantResult = relevantPoints.find(
         (point) => point.payload?.chunkId === chunkId,
       );
 
@@ -86,7 +90,7 @@ export const buildRAGContext = (
 [Source ${index + 1}]
 Document ID: ${chunk.documentId}
 Chunk ID: ${chunk.chunkId}
-${chunk.score !== undefined ? `Similarity: ${chunk.score}` : ""}
+
 
 ${chunk.content}
       `.trim(),

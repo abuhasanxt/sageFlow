@@ -3,7 +3,7 @@ import { openai } from "../../lib/onenai";
 
 import { buildRAGContext, buildRAGPrompt, retrieveRelevantChunks } from "./chat.service";
 
-
+const UNKNOWN_ANSWER = "I don't know based on the provided documents.";
 export const generateRAGAnswer = async (
   userId: string,
   question: string,
@@ -17,8 +17,7 @@ export const generateRAGAnswer = async (
   //  No relevant information
   if (chunks.length === 0) {
     return {
-      answer:
-        "I don't know based on the provided documents.",
+      answer: UNKNOWN_ANSWER,
       citations: [],
     };
   }
@@ -45,15 +44,173 @@ export const generateRAGAnswer = async (
   });
 
   //  Extract Claude text
-  const answer = response.choices[0]?.message?.content;
+  const rawAnswer = response.choices[0]?.message?.content;
+  if (!rawAnswer || typeof rawAnswer !== "string") {
+    return {
+      answer: UNKNOWN_ANSWER,
+      citations: [],
+    };
+  }
+  const answer=rawAnswer.trim();
+ if(answer.includes(UNKNOWN_ANSWER)){
+  return {
+    answer: UNKNOWN_ANSWER, 
+    citations: [],
+  };
+ }
+//extract cited sources number
+ const sourceNumbers = [
+    ...new Set(
+      [...answer.matchAll(/\[Source\s+(\d+)\]/g)]
+        .map((match) => Number(match[1])),
+    ),
+  ];
+
+  
+//Validate source numbers
+  const validSources =sourceNumbers.filter(
+        (source) =>Number.isInteger(source) &&
+         source >= 1 && 
+         source <= chunks.length,
+      )
+
+  //no valid citations:fail closed
+  if (validSources.length === 0) {
+    return {
+      answer: UNKNOWN_ANSWER,
+      citations: [],
+    };
+  }
+
+  //return answer with cited chunks only
 
   return {
-    answer,
-    citations: chunks.map((chunk, index) => ({
-      source: index + 1,
-      documentId: chunk.documentId,
-      chunkId: chunk.chunkId,
-      score: chunk.score,
-    })),
+    answer: answer,
+    citations: validSources.map((source) => {
+      const chunk = chunks[source - 1];
+      return {
+        source: source,
+        documentId: chunk.documentId,
+        chunkId: chunk.chunkId,
+        score: chunk.score,
+      };
+    }),
   };
 };
+
+
+export async function* streamRAGAnswer(
+  userId: string,
+  question: string,
+) {
+  const chunks = await retrieveRelevantChunks(
+    userId,
+    question,
+  );
+
+  // No relevant chunks
+  if (chunks.length === 0) {
+    yield {
+      type: "text",
+      content: UNKNOWN_ANSWER,
+    };
+
+    yield {
+      type: "citations",
+      citations: [],
+    };
+
+    return;
+  }
+
+  // Build context and prompt
+  const context = buildRAGContext(chunks);
+
+  const prompt = buildRAGPrompt(
+    question,
+    context,
+  );
+
+  // Call LLM with streaming enabled
+  const stream = await openai.chat.completions.create({
+    model: AI_CONFIG.claudeModel,
+    max_tokens: AI_CONFIG.maxTokens,
+    stream: true,
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  });
+
+  let fullAnswer = "";
+
+  // Read streamed chunks
+  for await (const part of stream) {
+    const content = part.choices[0]?.delta?.content;
+
+    if (typeof content === "string" && content.length > 0) {
+      fullAnswer += content;
+
+      yield {
+        type: "text",
+        content,
+      };
+    }
+  }
+
+  const answer = fullAnswer.trim();
+
+  // Handle refusal
+  if (answer.includes(UNKNOWN_ANSWER)) {
+    yield {
+      type: "citations",
+      citations: [],
+    };
+
+    return;
+  }
+
+  // Extract cited source numbers
+  const sourceNumbers = [
+    ...new Set(
+      [...answer.matchAll(/\[Source\s+(\d+)\]/g)]
+        .map((match) => Number(match[1])),
+    ),
+  ];
+
+  // Validate sources
+  const validSources = sourceNumbers.filter(
+    (source) =>
+      Number.isInteger(source) &&
+      source >= 1 &&
+      source <= chunks.length,
+  );
+
+  // Fail closed if no valid citations
+  if (validSources.length === 0) {
+    yield {
+      type: "citations",
+      citations: [],
+      refused: true,
+    };
+
+    return;
+  }
+
+  // Send citations after the answer is complete
+  yield {
+    type: "citations",
+    citations: validSources.map((source) => {
+      const chunk = chunks[source - 1];
+
+      return {
+        source,
+        documentId: chunk.documentId,
+        chunkId: chunk.chunkId,
+        score: chunk.score,
+      };
+    }),
+  };
+}
