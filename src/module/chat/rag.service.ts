@@ -137,6 +137,9 @@ export async function* streamRAGAnswer(
     model: AI_CONFIG.claudeModel,
     max_tokens: AI_CONFIG.maxTokens,
     stream: true,
+     stream_options: {
+      include_usage: true,
+    },
     messages: [
       {
         role: "user",
@@ -146,9 +149,22 @@ export async function* streamRAGAnswer(
   });
 
   let fullAnswer = "";
+    let tokensIn: number | null = null;
+  let tokensOut: number | null = null;
 
   // Read streamed chunks
   for await (const part of stream) {
+    if (part.usage) {
+  tokensIn =
+    typeof part.usage.prompt_tokens === "number"
+      ? part.usage.prompt_tokens
+      : null;
+
+  tokensOut =
+    typeof part.usage.completion_tokens === "number"
+      ? part.usage.completion_tokens
+      : null;
+}
     const content = part.choices[0]?.delta?.content;
 
     if (typeof content === "string" && content.length > 0) {
@@ -168,6 +184,11 @@ export async function* streamRAGAnswer(
     yield {
       type: "citations",
       citations: [],
+    };
+      yield {
+      type: "usage" as const,
+      tokensIn,
+      tokensOut,
     };
 
     return;
@@ -191,26 +212,38 @@ export async function* streamRAGAnswer(
   // Fail closed if no valid citations
   if (validSources.length === 0) {
     yield {
-      type: "citations",
+      type: "citations" as const,
       citations: [],
       refused: true,
     };
-
+ yield {
+      type: "usage" as const,
+      tokensIn,
+      tokensOut,
+    };
     return;
   }
-
+  // Return cited chunks only
+  const citations = validSources.map((source) => {
+    const chunk = chunks[source - 1];
+    return{
+        source,
+      documentId: chunk.documentId,
+      chunkId: chunk.chunkId,
+      score: chunk.score,
+    };
+    });
   // Send citations after the answer is complete
   yield {
-    type: "citations",
-    citations: validSources.map((source) => {
-      const chunk = chunks[source - 1];
+    type: "citations" as const,
+    citations,
 
-      return {
-        source,
-        documentId: chunk.documentId,
-        chunkId: chunk.chunkId,
-        score: chunk.score,
-      };
-    }),
+     
+    }
+     yield {
+    type: "usage" as const,
+    tokensIn,
+    tokensOut,
   };
-}
+  };
+

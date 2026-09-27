@@ -51,6 +51,8 @@ const sendMessage = catchAsync(
       score: number;
     }[] = [];
 
+    let tokensIn: number | null = null;
+    let tokensOut: number | null = null;
     try {
       // 3. Stream RAG answer
       for await (const event of result.stream) {
@@ -75,22 +77,31 @@ const sendMessage = catchAsync(
           res.write(
             `data: ${JSON.stringify({
               type: "citations",
-              citations: event.citations,
+              citations
             })}\n\n`,
           );
         }
-      }
 
+        // Collect token usage from RAG service
+        if (event.type === "usage") {
+  tokensIn = event.tokensIn ?? null;
+  tokensOut = event.tokensOut ?? null;
+}
+      }
       // 4. Save assistant response
       if (!res.writableEnded) {
+        return
+      }
         const assistantMessage =
-          await chatApiService.saveAssistantMessage(
-            conversationId as string,
-            fullAnswer,
-            citations,
-          );
-
+        await chatApiService.saveAssistantMessage(
+          conversationId as string,
+          fullAnswer.trim(),
+          citations,
+          tokensIn,
+          tokensOut,
+        );
         // 5. Send completed event
+      if (!res.writableEnded) {
         res.write(
           `data: ${JSON.stringify({
             type: "done",
@@ -100,6 +111,8 @@ const sendMessage = catchAsync(
 
         res.end();
       }
+
+    
     } catch (error) {
         console.error("Error generating RAG answer:", error);
       if (!res.writableEnded) {

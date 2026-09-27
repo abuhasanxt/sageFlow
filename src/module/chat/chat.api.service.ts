@@ -37,6 +37,8 @@ const saveAssistantMessage = async (
     chunkId: string;
     score: number;
   }[],
+   tokensIn: number | null = null,
+  tokensOut: number | null = null,
 ) => {
   const message = await prisma.message.create({
     data: {
@@ -44,6 +46,9 @@ const saveAssistantMessage = async (
       role: MessageRole.ASSISTANT,
       content,
       citations: citations.map((citation) => JSON.stringify(citation)),
+      tokensIn,
+      tokensOut,
+      costCents:null
     },
   });
 
