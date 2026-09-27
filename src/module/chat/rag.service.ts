@@ -1,18 +1,17 @@
 import { AI_CONFIG } from "../../config/ai";
 import { openai } from "../../lib/onenai";
 
-import { buildRAGContext, buildRAGPrompt, retrieveRelevantChunks } from "./chat.service";
+import {
+  buildRAGContext,
+  buildRAGPrompt,
+  ChatHistory,
+  retrieveRelevantChunks,
+} from "./chat.service";
 
 const UNKNOWN_ANSWER = "I don't know based on the provided documents.";
-export const generateRAGAnswer = async (
-  userId: string,
-  question: string,
-) => {
+export const generateRAGAnswer = async (userId: string, question: string) => {
   //  Retrieve relevant chunks
-  const chunks = await retrieveRelevantChunks(
-    userId,
-    question,
-  );
+  const chunks = await retrieveRelevantChunks(userId, question);
 
   //  No relevant information
   if (chunks.length === 0) {
@@ -26,10 +25,7 @@ export const generateRAGAnswer = async (
   const context = buildRAGContext(chunks);
 
   //  Build prompt
-  const prompt = buildRAGPrompt(
-    question,
-    context,
-  );
+  const prompt = buildRAGPrompt(question, context);
 
   //  Ask Claude
   const response = await openai.chat.completions.create({
@@ -51,28 +47,27 @@ export const generateRAGAnswer = async (
       citations: [],
     };
   }
-  const answer=rawAnswer.trim();
- if(answer.includes(UNKNOWN_ANSWER)){
-  return {
-    answer: UNKNOWN_ANSWER, 
-    citations: [],
-  };
- }
-//extract cited sources number
- const sourceNumbers = [
+  const answer = rawAnswer.trim();
+  if (answer.includes(UNKNOWN_ANSWER)) {
+    return {
+      answer: UNKNOWN_ANSWER,
+      citations: [],
+    };
+  }
+  //extract cited sources number
+  const sourceNumbers = [
     ...new Set(
-      [...answer.matchAll(/\[Source\s+(\d+)\]/g)]
-        .map((match) => Number(match[1])),
+      [...answer.matchAll(/\[Source\s+(\d+)\]/g)].map((match) =>
+        Number(match[1]),
+      ),
     ),
   ];
 
-  
-//Validate source numbers
-  const validSources =sourceNumbers.filter(
-        (source) =>Number.isInteger(source) &&
-         source >= 1 && 
-         source <= chunks.length,
-      )
+  //Validate source numbers
+  const validSources = sourceNumbers.filter(
+    (source) =>
+      Number.isInteger(source) && source >= 1 && source <= chunks.length,
+  );
 
   //no valid citations:fail closed
   if (validSources.length === 0) {
@@ -98,15 +93,24 @@ export const generateRAGAnswer = async (
   };
 };
 
-
 export async function* streamRAGAnswer(
   userId: string,
   question: string,
+  history: ChatHistory = [],
 ) {
-  const chunks = await retrieveRelevantChunks(
-    userId,
+  const previousUserMessages = history
+    .filter(
+      (message) =>
+        message.role === "USER" && message.content.trim() !== question.trim(),
+    )
+    .slice(-3);
+
+  const retrievalQuery = [
+    ...previousUserMessages.map((message) => message.content),
     question,
-  );
+  ].join(" ");
+
+  const chunks = await retrieveRelevantChunks(userId, retrievalQuery);
 
   // No relevant chunks
   if (chunks.length === 0) {
@@ -126,10 +130,7 @@ export async function* streamRAGAnswer(
   // Build context and prompt
   const context = buildRAGContext(chunks);
 
-  const prompt = buildRAGPrompt(
-    question,
-    context,
-  );
+  const prompt = buildRAGPrompt(question, context, history);
 
   // Call LLM with streaming enabled
   const stream = await openai.chat.completions.create({
@@ -175,17 +176,16 @@ export async function* streamRAGAnswer(
   // Extract cited source numbers
   const sourceNumbers = [
     ...new Set(
-      [...answer.matchAll(/\[Source\s+(\d+)\]/g)]
-        .map((match) => Number(match[1])),
+      [...answer.matchAll(/\[Source\s+(\d+)\]/g)].map((match) =>
+        Number(match[1]),
+      ),
     ),
   ];
 
   // Validate sources
   const validSources = sourceNumbers.filter(
     (source) =>
-      Number.isInteger(source) &&
-      source >= 1 &&
-      source <= chunks.length,
+      Number.isInteger(source) && source >= 1 && source <= chunks.length,
   );
 
   // Fail closed if no valid citations

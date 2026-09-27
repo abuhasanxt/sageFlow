@@ -1,3 +1,4 @@
+import { MessageRole } from "../../../generated/prisma/enums";
 import { generateEmbedding } from "../../lib/embedding";
 import { prisma } from "../../lib/prisma";
 import { searchUserDocuments } from "../../lib/qdran";
@@ -8,22 +9,14 @@ export const retrieveRelevantChunks = async (
 ) => {
   const queryVector = await generateEmbedding(question);
 
-  const results = await searchUserDocuments(
-    userId,
-    queryVector,
-    5,
-  );
- // Filter low similarity results
+  const results = await searchUserDocuments(userId, queryVector, 5);
+  // Filter low similarity results
   const relevantPoints = results.points.filter(
-    (point) =>
-      point.score >= SIMILARITY_THRESHOLD,
+    (point) => point.score >= SIMILARITY_THRESHOLD,
   );
   const chunkIds = relevantPoints
     .map((result) => result.payload?.chunkId)
-    .filter(
-      (chunkId): chunkId is string =>
-        typeof chunkId === "string",
-    );
+    .filter((chunkId): chunkId is string => typeof chunkId === "string");
 
   if (chunkIds.length === 0) {
     return [];
@@ -38,9 +31,7 @@ export const retrieveRelevantChunks = async (
     },
   });
 
-  const chunkMap = new Map(
-    chunks.map((chunk) => [chunk.id, chunk]),
-  );
+  const chunkMap = new Map(chunks.map((chunk) => [chunk.id, chunk]));
 
   return chunkIds
     .map((chunkId) => {
@@ -97,7 +88,24 @@ ${chunk.content}
     )
     .join("\n\n---\n\n");
 };
-export const buildRAGPrompt = (question: string, context: string) => {
+export type ChatHistory = {
+  role: MessageRole;
+  content: string;
+}[];
+export const buildRAGPrompt = (
+  question: string,
+  context: string,
+  history: ChatHistory = [],
+) => {
+  const conversationHistory =
+    history.length > 0
+      ? history
+          .map(
+            (message) =>
+              `${message.role === "USER" ? "User" : "Assistant"}: ${message.content}`,
+          )
+          .join("\n")
+      : "No previous conversation.";
   return `
 You are SageFlow, a knowledge assistant.
 
@@ -113,6 +121,9 @@ Rules:
 5. Use citations in this format: [Source 1], [Source 2].
 6. Only cite a source when that source actually supports the claim.
 7. Keep the answer clear and concise.
+
+Conversation History:
+${conversationHistory}
 
 Context:
 ${context}

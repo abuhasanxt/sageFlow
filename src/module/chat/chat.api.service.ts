@@ -4,11 +4,7 @@ import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import { streamRAGAnswer } from "./rag.service";
 
-
-const checkConversation = async (
-  userId: string,
-  conversationId: string,
-) => {
+const checkConversation = async (userId: string, conversationId: string) => {
   const conversation = await prisma.conversation.findFirst({
     where: {
       id: conversationId,
@@ -19,10 +15,7 @@ const checkConversation = async (
   return conversation;
 };
 
-const saveUserMessage = async (
-  conversationId: string,
-  content: string,
-) => {
+const saveUserMessage = async (conversationId: string, content: string) => {
   const message = await prisma.message.create({
     data: {
       conversationId,
@@ -50,9 +43,7 @@ const saveAssistantMessage = async (
       conversationId,
       role: MessageRole.ASSISTANT,
       content,
-      citations: citations.map((citation) =>
-        JSON.stringify(citation),
-      ),
+      citations: citations.map((citation) => JSON.stringify(citation)),
     },
   });
 
@@ -65,29 +56,38 @@ const sendMessage = async (
   content: string,
 ) => {
   // 1. Check conversation ownership
-  const conversation = await checkConversation(
-    userId,
-    conversationId,
-  );
+  const conversation = await checkConversation(userId, conversationId);
 
   if (!conversation) {
     throw new AppError(status.NOT_FOUND, "Conversation not found");
   }
-
+  //  Fetch previous conversation history
+  const previousMessages = await prisma.message.findMany({
+    where: {
+      conversationId,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 10,
+  });
+  // Reverse to maintain chronological order
+  const history = previousMessages.reverse().map((message) => ({
+    role: message.role,
+    content: message.content,
+  }));
   // 2. Save user message
-  const userMessage = await saveUserMessage(
-    conversationId,
-    content,
-  );
+  const userMessage = await saveUserMessage(conversationId, content);
+  // 4. Start RAG stream with conversation history
 
+  const stream = streamRAGAnswer(userId, content, history);
   return {
     userMessage,
-    stream: streamRAGAnswer(userId, content),
+    stream,
   };
 };
 
 export const chatApiService = {
-  
   checkConversation,
   saveUserMessage,
   saveAssistantMessage,
